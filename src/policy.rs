@@ -9,6 +9,8 @@ use serde_plain::{derive_display_from_serialize, derive_fromstr_from_deserialize
 use std::{collections::HashMap, convert::TryFrom, num::NonZeroU64};
 use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
 
+use openssl::{stack::Stack, x509::*};
+
 pub type CosignVerificationKey = VerifyingKey<p256::NistP256>;
 
 // A signed root policy object
@@ -23,6 +25,30 @@ pub struct Policy {
 impl Policy {
     pub fn validate_expires(&self) -> chrono::Duration {
         self.signed.expires.signed_duration_since(Utc::now())
+    }
+
+    pub fn verify_fulcio_chain(&self) -> Result<bool, anyhow::Error> {
+        let root_cert = std::include_bytes!("../tests/test_data/fulcio_root.pem");
+        let root_cert = X509::from_pem(root_cert).unwrap();
+        let leaf_cert = base64::decode(&self.signatures[0].cert)?;
+        let leaf_cert = X509::from_pem(&leaf_cert)?;
+        
+        // Check 1 : verifies that the leaf cert's issuer matches the root cert's subject field.
+        //println!("{:?}",root_cert.issued(&leaf_cert).error_string());
+        
+        let mut store_bldr = store::X509StoreBuilder::new()?;
+        store_bldr.add_cert(root_cert.clone())?;
+        let store = store_bldr.build();
+        
+        let mut chain = Stack::new()?;
+        let _ = chain.push(leaf_cert.clone());
+
+        let mut context = X509StoreContext::new()?;
+        println!("{:?}",context.init(&store, &leaf_cert, &chain, |c| c.verify_cert())?);
+
+        //println!("{:?}",store_bldr);
+
+        Ok(true)
     }
 
     /// Extract the public key from the policy
@@ -243,4 +269,16 @@ mod tests {
         let outcome = policy.verify_signature(&pub_key.unwrap(), msg); //#[allow_ci]
         assert!(outcome.is_err());
     }
+
+    // Note: open an issue about getting tests to run on Windows
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn validate_fulcio_cert_success() {
+        let setup = Setup::new();
+        let policy = setup.read_good_policy();
+
+        let fulcio = policy.verify_fulcio_chain();
+        assert!(fulcio.is_ok());
+    }
+    
 }

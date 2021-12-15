@@ -38,13 +38,16 @@ impl Policy {
             panic!("Invalid issuer relationship in certificate chain.");
         } */
 
-        let chain = Stack::new().unwrap();
+        let mut chain = Stack::new().unwrap();
+        let _ = chain.push(leaf_cert.clone());
 
         let mut store_bldr = store::X509StoreBuilder::new()?;
         store_bldr.add_cert(root_cert.clone())?;
         
         let mut flags = openssl::x509::verify::X509VerifyFlags::empty();
+        //flags.remove(openssl::x509::verify::X509VerifyFlags::USE_CHECK_TIME);
         flags.insert(openssl::x509::verify::X509VerifyFlags::NO_CHECK_TIME);
+        println!("{:?}",flags);
         store_bldr.set_flags(flags)?;
         
         let store = store_bldr.build();

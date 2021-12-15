@@ -28,27 +28,30 @@ impl Policy {
     }
 
     pub fn verify_fulcio_chain(&self) -> Result<bool, anyhow::Error> {
-        let root_cert = std::include_bytes!("../tests/test_data/fulcio_root.pem");
+        let root_cert = std::include_bytes!("../tests/test_data/alt.pem");
         let root_cert = X509::from_pem(root_cert).unwrap();
         let leaf_cert = base64::decode(&self.signatures[0].cert)?;
         let leaf_cert = X509::from_pem(&leaf_cert)?;
         
         // Check 1 : verifies that the leaf cert's issuer matches the root cert's subject field.
-        //println!("{:?}",root_cert.issued(&leaf_cert).error_string());
-        
+  /*       if root_cert.issued(&leaf_cert) != X509VerifyResult::OK {
+            panic!("Invalid issuer relationship in certificate chain.");
+        } */
+
+        let chain = Stack::new().unwrap();
+
         let mut store_bldr = store::X509StoreBuilder::new()?;
         store_bldr.add_cert(root_cert.clone())?;
-        let store = store_bldr.build();
         
-        let mut chain = Stack::new()?;
-        let _ = chain.push(leaf_cert.clone());
+        let mut flags = openssl::x509::verify::X509VerifyFlags::empty();
+        flags.insert(openssl::x509::verify::X509VerifyFlags::NO_CHECK_TIME);
+        store_bldr.set_flags(flags)?;
+        
+        let store = store_bldr.build();
 
+        // Check 2 : verifies that the leaf cert's issuer matches the root cert's subject field.
         let mut context = X509StoreContext::new()?;
-        println!("{:?}",context.init(&store, &leaf_cert, &chain, |c| c.verify_cert())?);
-
-        //println!("{:?}",store_bldr);
-
-        Ok(true)
+        Ok(context.init(&store, &leaf_cert, &chain, |c| c.verify_cert())?)
     }
 
     /// Extract the public key from the policy

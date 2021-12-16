@@ -8,13 +8,12 @@ use serde_json::{value::RawValue, Value};
 use serde_plain::{derive_display_from_serialize, derive_fromstr_from_deserialize};
 use std::{collections::HashMap, convert::TryFrom, num::NonZeroU64};
 use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
-
 use openssl::{stack::Stack, x509::*};
 
-pub type CosignVerificationKey = VerifyingKey<p256::NistP256>;
+pub(crate) type CosignVerificationKey = VerifyingKey<p256::NistP256>;
 
 // A signed root policy object
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Policy {
     // A list of signatures.
     pub signatures: Vec<Signature>,
@@ -84,7 +83,7 @@ impl Policy {
 // This holds the raw data from a serialized policy, accessible via the
 // 'signatures' and 'signed' fields. We must preserve this data as RawValues
 // in order for signature verification to work.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct RawPolicy<'a> {
     #[serde(borrow)]
     pub signatures: &'a RawValue,
@@ -93,7 +92,7 @@ struct RawPolicy<'a> {
 }
 
 // A signature and the key ID and certificate that made it.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Signature {
     // The hex encoded key ID that made this signature.
     pub keyid: String,
@@ -104,7 +103,7 @@ pub struct Signature {
 }
 
 // The root policy indicated the trusted root keys.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Signed {
     pub consistent_snapshot: bool,
     pub expires: DateTime<Utc>,
@@ -115,7 +114,7 @@ pub struct Signed {
     pub version: NonZeroU64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RoleKeys {
     /// The key IDs used for the role.
     pub keyids: Vec<String>,
@@ -144,7 +143,7 @@ impl TryFrom<&str> for RoleType {
 derive_display_from_serialize!(RoleType);
 derive_fromstr_from_deserialize!(RoleType);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "keytype")]
 pub enum Key {
     /// A sigstore oidc key.
@@ -164,7 +163,7 @@ pub enum Key {
 derive_display_from_serialize!(Key);
 derive_fromstr_from_deserialize!(Key);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Represents a deserialized (decoded) SigstoreOidc public key.
 pub struct SigstoreOidcKey {
     /// The identity (subject)
@@ -200,7 +199,7 @@ mod tests {
         }
 
         fn read_good_policy(&self) -> Policy {
-            let raw_json = read(&self.good_policy).expect("Cannot read good policy file");
+            let raw_json = read(&self.good_policy).expect("Cannot read bad policy file");
             serde_json::from_slice(&raw_json).expect("Cannot deserialize policy")
         }
 
@@ -272,6 +271,7 @@ mod tests {
         let outcome = policy.verify_signature(&pub_key.unwrap(), msg); //#[allow_ci]
         assert!(outcome.is_err());
     }
+<<<<<<< HEAD
 
     // Note: open an issue about getting tests to run on Windows
     #[test]
@@ -286,4 +286,6 @@ mod tests {
         let fulcio = policy.verify_fulcio_chain(root_cert).unwrap();
         assert_eq!(fulcio, true);
     }
+=======
+>>>>>>> main
 }

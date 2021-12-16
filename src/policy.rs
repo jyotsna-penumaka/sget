@@ -27,16 +27,15 @@ impl Policy {
         self.signed.expires.signed_duration_since(Utc::now())
     }
 
-    pub fn verify_fulcio_chain(&self) -> Result<bool, anyhow::Error> {
-        let root_cert = std::include_bytes!("../tests/test_data/alt.pem");
-        let root_cert = X509::from_pem(root_cert).unwrap();
+    pub fn verify_fulcio_chain(&self, root_cert: openssl::x509::X509) -> Result<bool, anyhow::Error> {
+        
         let leaf_cert = base64::decode(&self.signatures[0].cert)?;
         let leaf_cert = X509::from_pem(&leaf_cert)?;
-        
+
         // Check 1 : verifies that the leaf cert's issuer matches the root cert's subject field.
-  /*       if root_cert.issued(&leaf_cert) != X509VerifyResult::OK {
+       if root_cert.issued(&leaf_cert) != X509VerifyResult::OK {
             panic!("Invalid issuer relationship in certificate chain.");
-        } */
+        }
 
         let mut chain = Stack::new().unwrap();
         let _ = chain.push(leaf_cert.clone());
@@ -45,9 +44,7 @@ impl Policy {
         store_bldr.add_cert(root_cert.clone())?;
         
         let mut flags = openssl::x509::verify::X509VerifyFlags::empty();
-        //flags.remove(openssl::x509::verify::X509VerifyFlags::USE_CHECK_TIME);
         flags.insert(openssl::x509::verify::X509VerifyFlags::NO_CHECK_TIME);
-        println!("{:?}",flags);
         store_bldr.set_flags(flags)?;
         
         let store = store_bldr.build();
@@ -283,8 +280,10 @@ mod tests {
         let setup = Setup::new();
         let policy = setup.read_good_policy();
 
-        let fulcio = policy.verify_fulcio_chain();
-        assert!(fulcio.is_ok());
+        let root_cert = std::include_bytes!("../tests/test_data/fulcio_root.pem");
+        let root_cert = X509::from_pem(root_cert).unwrap();
+
+        let fulcio = policy.verify_fulcio_chain(root_cert).unwrap();
+        assert_eq!(fulcio, true);
     }
-    
 }
